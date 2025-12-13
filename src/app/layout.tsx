@@ -2,12 +2,13 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/providers'
+import { Header } from '@/components/layout/header'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Lyra - Decentralized Referral Marketplace',
-  description: 'Skin in the Game referral platform for high-quality talent connections',
+  title: 'Lyra - Professional Referral Platform',
+  description: 'High-quality referral platform where commitment ensures quality',
 }
 
 export default function RootLayout({
@@ -19,6 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Providers>
+          <Header />
           {children}
         </Providers>
       </body>
