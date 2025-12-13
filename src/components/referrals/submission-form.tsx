@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import { contractActions } from '@/lib/contract-actions'
 
 interface FormData {
   candidateName: string
@@ -17,49 +19,72 @@ interface FormData {
 interface SubmissionFormProps {
   jobId: string
   jobTitle: string
-  referralBonus: number // in USDC units
-  commitmentFee: number // in USDC units
+  onchainJobId: number
+  referralBonus: number // in dollars
+  commitmentFee: number // in cents
   onSuccess?: (claimLink: string) => void
 }
 
 export function SubmissionForm({ 
   jobId, 
-  jobTitle, 
+  jobTitle,
+  onchainJobId,
   referralBonus,
   commitmentFee,
   onSuccess 
 }: SubmissionFormProps) {
+  const { user } = usePrivy()
+  const { wallets } = useWallets()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [claimLink, setClaimLink] = useState('')
+  const [error, setError] = useState('')
   
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>()
 
-  const feeDisplay = (commitmentFee / 1_000_000).toFixed(2)
-  const bonusDisplay = (referralBonus / 1_000_000).toFixed(2)
+  const feeDisplay = (commitmentFee / 100).toFixed(2)
+  const bonusDisplay = referralBonus.toFixed(2)
 
   const onSubmit = async (data: FormData) => {
+    if (!user?.wallet?.address) {
+      setError('Wallet not connected')
+      return
+    }
+
     setIsSubmitting(true)
+    setError('')
+    
     try {
-      // TODO: Implement smart contract integration
-      // 1. Approve USDC
-      // 2. Call smart contract stakeReferral
-      // 3. Save to Supabase with claim hash
-      // 4. Generate claim link
+      // Get wallet provider from Privy
+      const wallet = wallets.find(w => w.address === user.wallet.address)
+      if (!wallet) {
+        throw new Error('Wallet not found')
+      }
       
-      // Temporary mock success
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      const mockClaimLink = `${window.location.origin}/claim/mock-hash-${Date.now()}`
-      setClaimLink(mockClaimLink)
+      const provider = await wallet.getEthereumProvider()
+
+      // Build full pitch with candidate info
+      const fullPitch = `Candidate: ${data.candidateName}\nProfile: ${data.candidateLinkedIn}\n\n${data.pitch}`
+
+      // Submit referral to smart contract
+      const result = await contractActions.submitReferral({
+        jobId,
+        onchainJobId,
+        pitch: fullPitch,
+        walletProvider: provider,
+        userAddress: user.wallet.address as `0x${string}`,
+      })
+
+      setClaimLink(result.claimLink)
       setShowSuccess(true)
       reset()
       
       if (onSuccess) {
-        onSuccess(mockClaimLink)
+        onSuccess(result.claimLink)
       }
-    } catch (error) {
-      console.error('Submission error:', error)
-      alert('Failed to submit referral. Please try again.')
+    } catch (err: any) {
+      console.error('Submission error:', err)
+      setError(err.message || 'Failed to submit referral. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -161,6 +186,13 @@ export function SubmissionForm({
                 The commitment fee prevents spam and is refunded if the company passes on your referral.
               </p>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900">
+                {error}
+              </div>
+            )}
 
             {/* Submit Button */}
             <Button 

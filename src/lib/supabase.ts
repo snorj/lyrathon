@@ -3,6 +3,7 @@ import { Database } from '@/types/supabase'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -10,6 +11,17 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
   },
 })
+
+// Server-side client with service role (bypasses RLS)
+// Use this for operations with Privy auth where RLS would block
+export const supabaseAdmin = supabaseServiceKey 
+  ? createClient<Database>(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : supabase // Fallback to regular client if service key not available
 
 // Helper functions for common operations
 export const supabaseHelpers = {
@@ -53,15 +65,32 @@ export const supabaseHelpers = {
     description: string
     initial_bounty: number
     onchain_id?: number
+    creator_id?: string
   }) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
+    // If creator_id is not provided, try to get it from Supabase auth
+    let creatorId = jobData.creator_id
+    let useAdminClient = false
+    
+    if (!creatorId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+      creatorId = user.id
+    } else {
+      // When creator_id is provided (from Privy), use admin client to bypass RLS
+      useAdminClient = true
+    }
 
-    return supabase
+    const client = useAdminClient ? supabaseAdmin : supabase
+    
+    return client
       .from('jobs')
       .insert({
-        ...jobData,
-        creator_id: user.id,
+        title: jobData.title,
+        description: jobData.description,
+        initial_bounty: jobData.initial_bounty,
+        onchain_id: jobData.onchain_id,
+        creator_id: creatorId,
+        state: 'open', // Set to open immediately
       })
       .select()
       .single()
