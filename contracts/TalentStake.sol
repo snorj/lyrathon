@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -19,7 +19,7 @@ contract TalentStake is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
 
     // Constants
-    uint256 public constant STAKE_AMOUNT = 50 * 10**6; // 50 USDC (6 decimals)
+    uint256 public constant STAKE_AMOUNT = 500_000; // 0.50 USDC (6 decimals)
     uint256 public constant REFERRER_SHARE = 80; // 80% of bounty to referrer
     uint256 public constant CANDIDATE_SHARE = 20; // 20% of bounty to candidate
 
@@ -71,7 +71,7 @@ contract TalentStake is Ownable, ReentrancyGuard {
     event JobWithdrawn(uint256 indexed jobId, address indexed creator, uint256 returnedAmount);
     event FundsDistributed(uint256 indexed referralId, address indexed referrer, address indexed candidate, uint256 referrerAmount, uint256 candidateAmount);
 
-    constructor(address _usdcAddress) {
+    constructor(address _usdcAddress) Ownable(msg.sender) {
         usdc = IERC20(_usdcAddress);
     }
 

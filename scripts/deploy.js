@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
 
 async function main() {
   console.log("Deploying TalentStake contract...");
@@ -7,7 +7,7 @@ async function main() {
   const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"; // Base Sepolia USDC
 
   // Get the contract factory
-  const TalentStake = await ethers.getContractFactory("TalentStake");
+  const TalentStake = await hre.ethers.getContractFactory("TalentStake");
 
   // Deploy the contract
   const talentStake = await TalentStake.deploy(USDC_ADDRESS);
